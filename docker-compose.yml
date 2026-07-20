@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: fixora_postgres
+    environment:
+      POSTGRES_DB: fixora_db
+      POSTGRES_USER: fixora_user
+      POSTGRES_PASSWORD: fixora_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fixora_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fixora-network
+
+  # NOTE: fixora-api runs locally via `./gradlew bootRun` for now.
+  # Once we start adding more services (Redis, Kafka, etc.) we can
+  # containerize the API here too and wire it up via `depends_on`.
+
+volumes:
+  postgres_data:
+
+networks:
+  fixora-network:
+    driver: bridge

@@ -1,0 +1,252 @@
+{
+  "info": {
+    "name": "Fixora API",
+    "description": "Postman collection for the Fixora API — Backstage-style application onboarding and user management service.\n\nKeep adding new requests here as new endpoints are built. Organize by resource (folders per controller).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard"]
+            },
+            "description": "Returns aggregated dashboard statistics including total application count, active application count, unique user count, and a complete list of all registered applications."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Applications",
+      "item": [
+        {
+          "name": "Onboard Application",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Payments Service\",\n  \"alias\": \"payments-svc\",\n  \"ownerEmail\": \"payments-owner@example.com\",\n  \"adGroupMapping\": \"payments-team,finance-team\",\n  \"description\": \"Handles payment processing\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/applications/onboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["applications", "onboard"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Applications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/applications",
+              "host": ["{{baseUrl}}"],
+              "path": ["applications"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Application By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/applications/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["applications", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Application By Alias",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/applications/alias/sample-app",
+              "host": ["{{baseUrl}}"],
+              "path": ["applications", "alias", "sample-app"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Active Applications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/applications/active/list",
+              "host": ["{{baseUrl}}"],
+              "path": ["applications", "active", "list"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Applications By AD Group",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/applications/ad-group/dev-team",
+              "host": ["{{baseUrl}}"],
+              "path": ["applications", "ad-group", "dev-team"]
+            },
+            "description": "Returns all applications whose ad_group_mapping (comma-separated list) contains the given AD group exactly."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Application",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Payments Service\",\n  \"alias\": \"payments-svc\",\n  \"ownerEmail\": \"payments-owner@example.com\",\n  \"adGroupMapping\": \"payments-team,finance-team,audit-team\",\n  \"description\": \"Handles payment processing and reconciliation\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/applications/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["applications", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Application",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/applications/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["applications", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane.doe@example.com\",\n  \"adGroup\": \"payments-team\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User By Email",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/email/admin@example.com",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "email", "admin@example.com"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane.doe@example.com\",\n  \"adGroup\": \"finance-team\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
