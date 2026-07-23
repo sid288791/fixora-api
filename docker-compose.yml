@@ -12,6 +12,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/00-create-keep-db.sql:/docker-entrypoint-initdb.d/00-create-keep-db.sql
       - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fixora_user"]
@@ -25,8 +26,115 @@ services:
   # Once we start adding more services (Redis, Kafka, etc.) we can
   # containerize the API here too and wire it up via `depends_on`.
 
+  redis:
+    image: redis:7-alpine
+    container_name: fixora_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fixora-network
+
+  keep-websocket-server:
+    image: quay.io/soketi/soketi:1.4-16-debian
+    container_name: fixora_keep_ws
+    ports:
+      - "6001:6001"
+      - "9601:9601"
+    environment:
+      - SOKETI_USER_AUTHENTICATION_TIMEOUT=3000
+      - SOKETI_DEBUG=1
+      - SOKETI_DEFAULT_APP_ID=1
+      - SOKETI_DEFAULT_APP_KEY=keepappkey
+      - SOKETI_DEFAULT_APP_SECRET=keepappsecret
+    networks:
+      - fixora-network
+    restart: unless-stopped
+
+  keep-backend:
+    build:
+      context: ./keep
+      dockerfile: docker/Dockerfile.api
+    container_name: fixora_keep_backend
+    environment:
+      - PORT=8080
+      - AUTH_TYPE=NO_AUTH
+      - SECRET_MANAGER_TYPE=FILE
+      - SECRET_MANAGER_DIRECTORY=/state
+      - DATABASE_CONNECTION_STRING=postgresql://keep_user:keep_password@postgres:5432/keep_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PUSHER_APP_ID=1
+      - PUSHER_APP_KEY=keepappkey
+      - PUSHER_APP_SECRET=keepappsecret
+      - PUSHER_HOST=keep-websocket-server
+      - PUSHER_PORT=6001
+      - USE_NGROK=false
+    ports:
+      - "8080:8080"
+    volumes:
+      - keep_state:/state
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keep-websocket-server:
+        condition: service_started
+    networks:
+      - fixora-network
+    restart: unless-stopped
+
+  keep-api-proxy:
+    image: nginx:alpine
+    container_name: fixora_keep_api_proxy
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./docker/keep-api-proxy.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - keep-backend
+    networks:
+      - fixora-network
+    restart: unless-stopped
+
+  keep-frontend:
+    build:
+      context: ./keep/keep-ui
+      dockerfile: ../docker/Dockerfile.ui
+    container_name: fixora_keep_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXTAUTH_SECRET=secret-change-this
+      - NEXTAUTH_URL=http://localhost:3000
+      - AUTH_TYPE=NO_AUTH
+      # Server-side (Next.js server, running inside the container) talks to keep-backend over the docker network
+      - API_URL=http://keep-api-proxy:8080
+      # Client-side (browser) talks to keep-backend via the published host port
+      - API_URL_CLIENT=http://localhost:8082
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - PUSHER_HOST=keep-websocket-server
+      - PUSHER_PORT=6001
+      - PUSHER_APP_KEY=keepappkey
+    depends_on:
+      - keep-backend
+      - keep-api-proxy
+      - keep-websocket-server
+    networks:
+      - fixora-network
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  redis_data:
+  keep_state:
 
 networks:
   fixora-network:

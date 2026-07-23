@@ -1,0 +1,15 @@
+Keep uses:
+•
+Keep backend: 8080
+•
+Keep UI: 3000
+•
+Keep API proxy: 8082
+•
+Fixora API: 8081
+•
+Keep UI: http://localhost:3000
+•
+Workflows: http://localhost:3000/workflows
+•
+Incidents/alerts: http://localhost:3000/incidents

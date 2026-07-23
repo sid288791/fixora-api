@@ -17,9 +17,14 @@ spring:
       max-request-size: 10MB
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8081}
   servlet:
     context-path: /api
+
+keep:
+  api:
+    url: ${KEEP_API_URL:http://localhost:8080}
+    key: ${KEEP_API_KEY:fixora-api-key}
 
 logging:
   level:
