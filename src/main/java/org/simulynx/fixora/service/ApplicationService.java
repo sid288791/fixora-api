@@ -81,6 +81,7 @@ public class ApplicationService {
     private ApplicationOnboardingDTO convertToDTO(Application app) {
         return new ApplicationOnboardingDTO(
             app.getId(),
+            app.getIntegrationId(),
             app.getName(),
             app.getAlias(),
             app.getOwnerEmail(),

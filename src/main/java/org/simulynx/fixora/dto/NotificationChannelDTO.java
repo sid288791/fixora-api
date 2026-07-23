@@ -19,6 +19,7 @@ public class NotificationChannelDTO {
     private String channelType;
     private String endpoint;
     private String configuration;
+    private String keepProviderId;
     private Boolean isDefault;
     private String status;
     private LocalDateTime createdAt;

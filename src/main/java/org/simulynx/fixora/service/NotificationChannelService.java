@@ -123,6 +123,7 @@ public class NotificationChannelService {
         dto.setChannelType(entity.getChannelType());
         dto.setEndpoint(entity.getEndpoint());
         dto.setConfiguration(entity.getConfiguration());
+        dto.setKeepProviderId(entity.getKeepProviderId());
         dto.setIsDefault(entity.getIsDefault());
         dto.setStatus(entity.getStatus());
         dto.setCreatedAt(entity.getCreatedAt());
@@ -140,6 +141,7 @@ public class NotificationChannelService {
         entity.setChannelType(dto.getChannelType());
         entity.setEndpoint(dto.getEndpoint());
         entity.setConfiguration(dto.getConfiguration());
+        entity.setKeepProviderId(dto.getKeepProviderId());
         entity.setIsDefault(dto.getIsDefault() != null ? dto.getIsDefault() : false);
         entity.setStatus(dto.getStatus() != null ? dto.getStatus() : "ACTIVE");
         return entity;

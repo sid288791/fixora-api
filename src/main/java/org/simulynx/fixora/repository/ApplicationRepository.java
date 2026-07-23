@@ -11,6 +11,7 @@ import java.util.List;
 @Repository
 public interface ApplicationRepository extends JpaRepository<Application, Long> {
     Optional<Application> findByAlias(String alias);
+    Optional<Application> findByIntegrationId(String integrationId);
     List<Application> findByStatus(String status);
 
     @Query(value = "SELECT * FROM applications a " +

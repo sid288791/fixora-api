@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "applications")
@@ -16,6 +17,9 @@ public class Application {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    
+    @Column(name = "integration_id", nullable = false, unique = true, updatable = false)
+    private String integrationId;
     
     @Column(nullable = false)
     private String name;
@@ -40,9 +44,11 @@ public class Application {
     
     @Column(name = "status")
     private String status = "ACTIVE";
-    
     @PrePersist
     protected void onCreate() {
+        if (this.integrationId == null) {
+            this.integrationId = UUID.randomUUID().toString();
+        }
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
     }

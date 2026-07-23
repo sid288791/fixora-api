@@ -41,6 +41,9 @@ public class NotificationChannel {
     @Column(name = "configuration", columnDefinition = "TEXT")
     private String configuration;
     
+    @Column(name = "keep_provider_id")
+    private String keepProviderId;
+    
     @Column(name = "is_default", nullable = false)
     private Boolean isDefault = false;
     

@@ -13,6 +13,8 @@ public class ApplicationOnboardingDTO {
     
     private Long id;
     
+    private String integrationId;
+    
     @NotBlank(message = "Application name is required")
     private String name;
     

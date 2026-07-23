@@ -28,6 +28,7 @@ public class DashboardService {
         var registeredApplications = applicationRepository.findAll().stream()
             .map(app -> new ApplicationOnboardingDTO(
                 app.getId(),
+                app.getIntegrationId(),
                 app.getName(),
                 app.getAlias(),
                 app.getOwnerEmail(),
