@@ -196,4 +196,45 @@ public class KeepIntegrationService {
             return result;
         }
     }
+    
+    public String createKeepWorkflowFromAlertConfig(Long alertConfigId, String alertName, String alertDescription, 
+                                                     String alertType, String severity, String channels) {
+        try {
+            log.info("Creating Keep workflow for alert configuration {}", alertConfigId);
+            
+            Map<String, Object> workflowDefinition = new HashMap<>();
+            workflowDefinition.put("name", "fixora-alert-" + alertConfigId + "-" + alertName.toLowerCase().replace(" ", "-"));
+            workflowDefinition.put("description", alertDescription != null ? alertDescription : "Workflow for alert: " + alertName);
+            
+            Map<String, Object> triggers = new HashMap<>();
+            triggers.put("type", "alert");
+            Map<String, Object> triggerConfig = new HashMap<>();
+            triggerConfig.put("alert_config_id", alertConfigId);
+            triggerConfig.put("alert_type", alertType);
+            triggerConfig.put("severity", severity);
+            triggers.put("config", triggerConfig);
+            workflowDefinition.put("triggers", List.of(triggers));
+            
+            if (channels != null && !channels.isEmpty()) {
+                Map<String, Object> steps = new HashMap<>();
+                steps.put("name", "send-notification");
+                steps.put("type", "action");
+                Map<String, Object> stepConfig = new HashMap<>();
+                stepConfig.put("channels", channels);
+                steps.put("config", stepConfig);
+                workflowDefinition.put("steps", List.of(steps));
+            }
+            
+            Map<String, Object> result = keepClient.createWorkflow(workflowDefinition);
+            
+            String keepWorkflowId = result != null && result.get("workflow_id") != null ? 
+                result.get("workflow_id").toString() : null;
+            
+            log.info("Successfully created Keep workflow with id: {}", keepWorkflowId);
+            return keepWorkflowId;
+        } catch (Exception e) {
+            log.error("Error creating Keep workflow for alert configuration {}", alertConfigId, e);
+            throw new RuntimeException("Failed to create Keep workflow for alert configuration", e);
+        }
+    }
 }

@@ -23,6 +23,12 @@ public class AlertConfigurationService {
     @Autowired
     private AuditService auditService;
     
+    @Autowired
+    private AlertWorkflowService alertWorkflowService;
+    
+    @Autowired
+    private KeepIntegrationService keepIntegrationService;
+    
     public AlertConfigurationDTO createAlertConfiguration(AlertConfigurationDTO dto) {
         log.info("Creating alert configuration for application {}", dto.getApplicationId());
         
@@ -35,6 +41,36 @@ public class AlertConfigurationService {
         auditService.logAction(dto.getApplicationId(), null, dto.getOwningAdGrp(), 
                 "ALERT_CONFIG", String.valueOf(saved.getId()), "CREATE", null, 
                 convertEntityToDto(saved));
+        
+        try {
+            String keepWorkflowId = keepIntegrationService.createKeepWorkflowFromAlertConfig(
+                    saved.getId(),
+                    saved.getName(),
+                    saved.getDescription(),
+                    saved.getAlertType(),
+                    saved.getSeverity(),
+                    saved.getChannels()
+            );
+            
+            if (keepWorkflowId != null) {
+                org.simulynx.fixora.dto.AlertWorkflowDTO workflowDto = new org.simulynx.fixora.dto.AlertWorkflowDTO();
+                workflowDto.setApplicationId(saved.getApplicationId());
+                workflowDto.setServiceId(saved.getServiceId());
+                workflowDto.setOwningAdGrp(saved.getOwningAdGrp());
+                workflowDto.setName(saved.getName() + " Workflow");
+                workflowDto.setDescription("Workflow for alert: " + saved.getName());
+                workflowDto.setKeepWorkflowId(keepWorkflowId);
+                workflowDto.setAlertConfigurationId(saved.getId());
+                workflowDto.setNotificationChannelIds(saved.getChannels());
+                workflowDto.setIsActive(true);
+                workflowDto.setStatus("ACTIVE");
+                
+                alertWorkflowService.createAlertWorkflow(workflowDto);
+                log.info("Alert workflow created for alert configuration {}", saved.getId());
+            }
+        } catch (Exception e) {
+            log.error("Failed to create Keep workflow for alert configuration {}", saved.getId(), e);
+        }
         
         log.info("Alert configuration created with id {}", saved.getId());
         return convertEntityToDto(saved);
@@ -111,6 +147,22 @@ public class AlertConfigurationService {
                 .orElseThrow(() -> new RuntimeException("Alert configuration not found"));
         
         AlertConfigurationDTO deletedValues = convertEntityToDto(existing);
+        
+        try {
+            List<org.simulynx.fixora.dto.AlertWorkflowDTO> workflows = alertWorkflowService.getAlertWorkflowsByApplication(applicationId);
+            for (org.simulynx.fixora.dto.AlertWorkflowDTO workflow : workflows) {
+                if (configId.equals(workflow.getAlertConfigurationId())) {
+                    if (workflow.getKeepWorkflowId() != null) {
+                        keepIntegrationService.deleteKeepWorkflow(workflow.getKeepWorkflowId());
+                        log.info("Deleted Keep workflow {} for alert configuration {}", workflow.getKeepWorkflowId(), configId);
+                    }
+                    alertWorkflowService.deleteAlertWorkflow(applicationId, workflow.getId());
+                    log.info("Deleted alert workflow {} for alert configuration {}", workflow.getId(), configId);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to delete Keep workflow for alert configuration {}", configId, e);
+        }
         
         alertConfigurationRepository.delete(existing);
         
