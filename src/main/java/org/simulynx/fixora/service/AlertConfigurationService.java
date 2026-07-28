@@ -3,7 +3,9 @@ package org.simulynx.fixora.service;
 import lombok.extern.slf4j.Slf4j;
 import org.simulynx.fixora.dto.AlertConfigurationDTO;
 import org.simulynx.fixora.entity.AlertConfiguration;
+import org.simulynx.fixora.entity.AlertWorkflow;
 import org.simulynx.fixora.repository.AlertConfigurationRepository;
+import org.simulynx.fixora.repository.AlertWorkflowRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,16 +18,19 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class AlertConfigurationService {
-    
+
     @Autowired
     private AlertConfigurationRepository alertConfigurationRepository;
-    
+
     @Autowired
     private AuditService auditService;
-    
+
     @Autowired
     private AlertWorkflowService alertWorkflowService;
-    
+
+    @Autowired
+    private AlertWorkflowRepository alertWorkflowRepository;
+
     @Autowired
     private KeepIntegrationService keepIntegrationService;
     
@@ -49,7 +54,8 @@ public class AlertConfigurationService {
                     saved.getDescription(),
                     saved.getAlertType(),
                     saved.getSeverity(),
-                    saved.getChannels()
+                    saved.getChannels(),
+                    Boolean.TRUE.equals(saved.getTriggerAiInvestigation())
             );
             
             if (keepWorkflowId != null) {
@@ -131,13 +137,44 @@ public class AlertConfigurationService {
         existing.setUpdatedAt(LocalDateTime.now());
         
         AlertConfiguration updated = alertConfigurationRepository.save(existing);
-        
-        auditService.logAction(applicationId, existing.getServiceId(), dto.getOwningAdGrp(), 
-                "ALERT_CONFIG", String.valueOf(configId), "UPDATE", oldValues, 
+
+        auditService.logAction(applicationId, existing.getServiceId(), dto.getOwningAdGrp(),
+                "ALERT_CONFIG", String.valueOf(configId), "UPDATE", oldValues,
                 convertEntityToDto(updated));
-        
+
+        syncKeepWorkflow(updated);
+
         log.info("Alert configuration updated with id {}", configId);
         return convertEntityToDto(updated);
+    }
+
+    /**
+     * Regenerates the linked Keep workflow so config changes (in particular flipping
+     * "Trigger AI Investigation" on/off) actually take effect on an already-existing config.
+     * Without this, the AI action was only ever baked in at creation time.
+     */
+    private void syncKeepWorkflow(AlertConfiguration config) {
+        List<AlertWorkflow> workflows = alertWorkflowRepository.findByAlertConfigurationId(config.getId());
+        if (workflows.isEmpty()) {
+            log.warn("No Keep workflow found for alert configuration {}, skipping sync", config.getId());
+            return;
+        }
+
+        try {
+            AlertWorkflow workflow = workflows.get(0);
+            keepIntegrationService.updateKeepWorkflowFromAlertConfig(
+                    workflow.getKeepWorkflowId(),
+                    config.getId(),
+                    config.getName(),
+                    config.getDescription(),
+                    config.getAlertType(),
+                    config.getSeverity(),
+                    config.getChannels(),
+                    Boolean.TRUE.equals(config.getTriggerAiInvestigation())
+            );
+        } catch (Exception e) {
+            log.error("Failed to sync Keep workflow for alert configuration {}", config.getId(), e);
+        }
     }
     
     public void deleteAlertConfiguration(Long applicationId, Long configId) {

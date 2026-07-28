@@ -9,6 +9,14 @@ build/
 !.env.example
 *.log
 
+### Keep (external clone, not vendored — see scripts/setup-keep.sh) ###
+/keep/
+
+### opensre-server (Python venv, not vendored — see opensre-server/README.md) ###
+opensre-server/.venv/
+opensre-server/__pycache__/
+opensre-server/*.pyc
+
 ### IntelliJ IDEA ###
 .idea/
 .idea/modules.xml

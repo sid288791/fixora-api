@@ -268,6 +268,51 @@ public class KeepClientImpl implements KeepClient {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getAlerts() {
+        try {
+            log.info("Fetching all alerts from Keep API");
+            String url = keepApiBaseUrl + "/alerts";
+            HttpEntity<Object> request = new HttpEntity<>(defaultHeaders());
+            List<?> response = restTemplate.exchange(url, HttpMethod.GET, request, List.class).getBody();
+
+            List<Map<String, Object>> alerts = new ArrayList<>();
+            if (response != null) {
+                for (Object item : response) {
+                    alerts.add((Map<String, Object>) item);
+                }
+            }
+
+            log.info("Successfully fetched {} alerts from Keep API", alerts.size());
+            return alerts;
+        } catch (RestClientException e) {
+            log.error("Error fetching alerts from Keep API", e);
+            throw new RuntimeException("Failed to fetch alerts from Keep API", e);
+        }
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getAlertHistory(String fingerprint) {
+        try {
+            String url = keepApiBaseUrl + "/alerts/" + fingerprint + "/history";
+            HttpEntity<Object> request = new HttpEntity<>(defaultHeaders());
+            List<?> response = restTemplate.exchange(url, HttpMethod.GET, request, List.class).getBody();
+
+            List<Map<String, Object>> history = new ArrayList<>();
+            if (response != null) {
+                for (Object item : response) {
+                    history.add((Map<String, Object>) item);
+                }
+            }
+            return history;
+        } catch (RestClientException e) {
+            log.error("Error fetching alert history for fingerprint {} from Keep API", fingerprint, e);
+            throw new RuntimeException("Failed to fetch alert history from Keep API", e);
+        }
+    }
+
+    @Override
     public Boolean healthCheck() {
         try {
             String url = keepApiBaseUrl + "/healthcheck";

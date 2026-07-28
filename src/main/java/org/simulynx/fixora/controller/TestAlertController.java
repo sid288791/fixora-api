@@ -32,6 +32,17 @@ public class TestAlertController {
         return ResponseEntity.ok(response);
     }
     
+    @GetMapping("/alerts")
+    public ResponseEntity<List<Map<String, Object>>> getAlerts(
+            @PathVariable Long applicationId,
+            @RequestParam(defaultValue = "active") String bucket) {
+        log.info("GET /api/applications/{}/alerts?bucket={}", applicationId, bucket);
+
+        List<Map<String, Object>> alerts = keepIntegrationService.getAlertsForApplication(applicationId, bucket);
+
+        return ResponseEntity.ok(alerts);
+    }
+
     @GetMapping("/keep/health")
     public ResponseEntity<Map<String, Object>> checkKeepHealth(
             @PathVariable Long applicationId) {

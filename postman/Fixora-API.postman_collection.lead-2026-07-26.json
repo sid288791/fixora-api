@@ -1,0 +1,1010 @@
+{
+	"info": {
+		"name": "Fixora API",
+		"description": "Postman collection for the Fixora API \u2014 Backstage-style application onboarding and user management service.\n\nKeep adding new requests here as new endpoints are built. Organize by resource (folders per controller).",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080/api",
+			"type": "string"
+		},
+		{
+			"key": "applicationId",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "alertConfigurationId",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "notificationChannelId",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "alertWorkflowId",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "keepWorkflowId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "keepProviderId",
+			"value": "console-test",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Dashboard",
+			"item": [
+				{
+					"name": "Get Dashboard Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/dashboard",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"dashboard"
+							]
+						},
+						"description": "Returns aggregated dashboard statistics including total application count, active application count, unique user count, and a complete list of all registered applications."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Applications",
+			"item": [
+				{
+					"name": "Onboard Application",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Payments Service\",\n  \"alias\": \"payments-svc\",\n  \"ownerEmail\": \"payments-owner@example.com\",\n  \"adGroupMapping\": \"payments-team,finance-team\",\n  \"description\": \"Handles payment processing\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/applications/onboard",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"onboard"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Applications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Application By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Application By Alias",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/alias/sample-app",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"alias",
+								"sample-app"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Active Applications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/active/list",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"active",
+								"list"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Applications By AD Group",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/ad-group/dev-team",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"ad-group",
+								"dev-team"
+							]
+						},
+						"description": "Returns all applications whose ad_group_mapping (comma-separated list) contains the given AD group exactly."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Application",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Payments Service\",\n  \"alias\": \"payments-svc\",\n  \"ownerEmail\": \"payments-owner@example.com\",\n  \"adGroupMapping\": \"payments-team,finance-team,audit-team\",\n  \"description\": \"Handles payment processing and reconciliation\",\n  \"status\": \"ACTIVE\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/applications/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Application",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"1"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Users",
+			"item": [
+				{
+					"name": "Create User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane.doe@example.com\",\n  \"adGroup\": \"payments-team\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Users",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get User By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get User By Email",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/email/admin@example.com",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"email",
+								"admin@example.com"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update User",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane.doe@example.com\",\n  \"adGroup\": \"finance-team\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete User",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"1"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Alert Configurations",
+			"item": [
+				{
+					"name": "Create Alert Configuration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/alert-configurations",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"alert-configurations"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"serviceId\": 3,\n  \"owningAdGrp\": \"sre-team\",\n  \"name\": \"Disk Space Alert\",\n  \"description\": \"Alert on low disk space\",\n  \"alertType\": \"METRIC\",\n  \"severity\": \"HIGH\",\n  \"conditionExpression\": \"disk_free < 10\",\n  \"enabled\": true\n}"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Alert Configurations",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/alert-configurations",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"alert-configurations"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Alert Configuration",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/alert-configurations/{{alertConfigurationId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"alert-configurations",
+								"{{alertConfigurationId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Alert Configuration",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/alert-configurations/{{alertConfigurationId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"alert-configurations",
+								"{{alertConfigurationId}}"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"serviceId\": 3,\n  \"owningAdGrp\": \"sre-team\",\n  \"name\": \"Disk Space Alert - Updated\",\n  \"description\": \"Alert on low disk space\",\n  \"alertType\": \"METRIC\",\n  \"severity\": \"CRITICAL\",\n  \"conditionExpression\": \"disk_free < 10\",\n  \"enabled\": true\n}"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Alert Configuration",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/alert-configurations/{{alertConfigurationId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"alert-configurations",
+								"{{alertConfigurationId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Notification Channels",
+			"item": [
+				{
+					"name": "Create Notification Channel",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/notification-channels",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"notification-channels"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"serviceId\": 1,\n  \"owningAdGrp\": \"dev-team\",\n  \"name\": \"Slack Alerts - Prod\",\n  \"description\": \"Primary Slack channel for production alerts\",\n  \"channelType\": \"SLACK\",\n  \"endpoint\": \"https://hooks.slack.com/services/T000/B000/XXXX\",\n  \"isDefault\": true\n}"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Notification Channels",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/notification-channels",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"notification-channels"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Notification Channel",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/notification-channels/{{notificationChannelId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"notification-channels",
+								"{{notificationChannelId}}"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"serviceId\": 1,\n  \"owningAdGrp\": \"dev-team\",\n  \"name\": \"Slack Alerts - Prod (Updated)\",\n  \"description\": \"Primary Slack channel for production alerts\",\n  \"channelType\": \"SLACK\",\n  \"endpoint\": \"https://hooks.slack.com/services/T000/B000/XXXX\",\n  \"isDefault\": true\n}"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Notification Channel",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/notification-channels/{{notificationChannelId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"notification-channels",
+								"{{notificationChannelId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Alert Workflows",
+			"item": [
+				{
+					"name": "Create Alert Workflow",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/alert-workflows",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"alert-workflows"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"serviceId\": 3,\n  \"owningAdGrp\": \"sre-team\",\n  \"name\": \"CPU Alert Workflow\",\n  \"description\": \"Workflow triggered on high CPU alert\",\n  \"alertConfigurationId\": 1,\n  \"notificationChannelIds\": \"1\",\n  \"isActive\": true\n}"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Alert Workflows",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/alert-workflows",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"alert-workflows"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Alert Workflow",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/alert-workflows/{{alertWorkflowId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"alert-workflows",
+								"{{alertWorkflowId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Alert Workflow",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/alert-workflows/{{alertWorkflowId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"alert-workflows",
+								"{{alertWorkflowId}}"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"serviceId\": 3,\n  \"owningAdGrp\": \"sre-team\",\n  \"name\": \"CPU Alert Workflow - v2\",\n  \"description\": \"Workflow triggered on high CPU alert\",\n  \"alertConfigurationId\": 1,\n  \"notificationChannelIds\": \"1\",\n  \"isActive\": true\n}"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Alert Workflow",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/alert-workflows/{{alertWorkflowId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"alert-workflows",
+								"{{alertWorkflowId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Keep Integration",
+			"item": [
+				{
+					"name": "Keep Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/keep/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"keep",
+								"health"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send Test Alert",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/test-alert",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"test-alert"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"alertConfigurationId\": 1,\n  \"notificationChannelId\": 1,\n  \"title\": \"Test Alert - High CPU\",\n  \"message\": \"CPU usage exceeded 90% on host web-01\",\n  \"severity\": \"HIGH\",\n  \"source\": \"fixora-test\"\n}"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Keep Provider",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/keep/providers/{{keepProviderId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"keep",
+								"providers",
+								"{{keepProviderId}}"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"provider_name\": \"console-test\",\n  \"provider_type\": \"console\",\n  \"authentication\": {}\n}"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Keep Provider",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/keep/providers/{{keepProviderId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"keep",
+								"providers",
+								"{{keepProviderId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Keep Provider",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/keep/providers/{{keepProviderId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"keep",
+								"providers",
+								"{{keepProviderId}}"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"provider_name\": \"console-test\",\n  \"provider_type\": \"console\",\n  \"authentication\": {}\n}"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Keep Provider",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/keep/providers/{{keepProviderId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"keep",
+								"providers",
+								"{{keepProviderId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Keep Workflow",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/keep/workflows",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"keep",
+								"workflows"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"workflow\": {\n    \"id\": \"fixora-test-workflow\",\n    \"description\": \"Test workflow created from Fixora API\",\n    \"triggers\": [\n      {\n        \"type\": \"alert\",\n        \"filters\": [\n          {\n            \"key\": \"source\",\n            \"value\": \"webhook\"\n          }\n        ]\n      }\n    ],\n    \"actions\": [\n      {\n        \"name\": \"log-action\",\n        \"provider\": {\n          \"type\": \"console\",\n          \"with\": {\n            \"message\": \"Alert received: {{ alert.name }}\"\n          }\n        }\n      }\n    ]\n  }\n}"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Keep Workflows",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/keep/workflows",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"keep",
+								"workflows"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Keep Workflow",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/keep/workflows/{{keepWorkflowId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"keep",
+								"workflows",
+								"{{keepWorkflowId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Keep Workflow",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/keep/workflows/{{keepWorkflowId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"keep",
+								"workflows",
+								"{{keepWorkflowId}}"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"workflow\": {\n    \"id\": \"fixora-test-workflow\",\n    \"description\": \"Test workflow created from Fixora API\",\n    \"triggers\": [\n      {\n        \"type\": \"alert\",\n        \"filters\": [\n          {\n            \"key\": \"source\",\n            \"value\": \"webhook\"\n          }\n        ]\n      }\n    ],\n    \"actions\": [\n      {\n        \"name\": \"log-action\",\n        \"provider\": {\n          \"type\": \"console\",\n          \"with\": {\n            \"message\": \"Alert received: {{ alert.name }}\"\n          }\n        }\n      }\n    ]\n  }\n}"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Keep Workflow",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/keep/workflows/{{keepWorkflowId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"keep",
+								"workflows",
+								"{{keepWorkflowId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Check Workflow Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/applications/{{applicationId}}/keep/workflows/{{keepWorkflowId}}/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"applications",
+								"{{applicationId}}",
+								"keep",
+								"workflows",
+								"{{keepWorkflowId}}",
+								"status"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

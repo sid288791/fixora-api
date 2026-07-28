@@ -1,5 +1,35 @@
 version: '3.8'
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Keep (keep-backend / keep-frontend / keep-api-proxy / keep-websocket-server)
+# ─────────────────────────────────────────────────────────────────────────────
+# These services build from ./keep and ./keep/keep-ui — an external clone of
+# https://github.com/keephq/keep that is NOT part of this repo (too large to
+# vendor in git). On a fresh checkout, `docker compose up` will fail on these
+# services with "path not found" until you've cloned Keep locally.
+#
+# Quick start (from fixora-api/):
+#   ./scripts/setup-keep.sh
+#
+# What that script does, step by step (do this manually if you'd rather not run it):
+#   1. git clone --depth 1 https://github.com/keephq/keep.git keep
+#   2. Fix line endings: on Windows, git checks Keep's *.sh files out with CRLF,
+#      which corrupts their #!/bin/sh shebang inside the Linux containers and
+#      causes cryptic "not found" / "no such file or directory" failures at
+#      build or container-startup time. Run:
+#        find keep -name "*.sh" -not -path "*/node_modules/*" -exec sed -i 's/\r$//' {} \;
+#   3. docker compose up -d --build postgres redis keep-websocket-server \
+#        keep-backend keep-api-proxy keep-frontend
+#   4. If keep-backend keeps restarting after step 3, Docker likely reused a
+#      cached image built before step 2's fix — force a clean rebuild:
+#        docker compose build --no-cache keep-backend
+#        docker compose up -d keep-backend
+#
+# Full debugging story / architecture notes: docs/keep.md
+# Keep UI once running: http://localhost:3000 — API: :8080 (direct) / :8082 (nginx proxy, injects
+# the X-API-Key header Keep's API requires even with AUTH_TYPE=NO_AUTH)
+# ─────────────────────────────────────────────────────────────────────────────
+
 services:
   postgres:
     image: postgres:15-alpine

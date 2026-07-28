@@ -29,7 +29,11 @@ public interface KeepClient {
     
     // Test Alert
     Map<String, Object> sendTestAlert(String workflowId, Map<String, Object> alertPayload);
-    
+
+    // Alerts
+    List<Map<String, Object>> getAlerts();
+    List<Map<String, Object>> getAlertHistory(String fingerprint);
+
     // Health Check
     Boolean healthCheck();
 }
