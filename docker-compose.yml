@@ -43,6 +43,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/00-create-keep-db.sql:/docker-entrypoint-initdb.d/00-create-keep-db.sql
+      - ./scripts/00-create-goalert-db.sql:/docker-entrypoint-initdb.d/01-create-goalert-db.sql
       - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fixora_user"]
@@ -157,6 +158,58 @@ services:
       - keep-backend
       - keep-api-proxy
       - keep-websocket-server
+    networks:
+      - fixora-network
+    restart: unless-stopped
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # GoAlert (target/goalert) — on-call scheduling, escalation policies, and
+  # SMS/voice paging via Twilio. Sits alongside Keep: for alert configs with
+  # severity=="critical" and a goalertServiceUrl set, Keep's workflow posts to
+  # GoAlert's generic alert-ingestion API (POST /api/v2/generic/incoming?token=...)
+  # which resolves who's on-call and pages them. Fixora/Keep never talks to
+  # Twilio directly — GoAlert owns that integration internally.
+  #
+  # First-time setup after `docker compose up -d goalert`:
+  #   1. Start a tunnel (e.g. ngrok) pointing at :8081 — Twilio's webhooks need
+  #      a real internet-reachable URL, localhost won't work for that part.
+  #   2. Open the tunnel URL in a browser, Admin > Config: set General.PublicURL
+  #      to the tunnel URL.
+  #   3. Admin > Config > Twilio: enable it, paste your Account SID, Auth Token,
+  #      and "From Number" (a Twilio trial number is fine for dev — trial calls
+  #      prepend a short disclaimer message). Set the Twilio messaging/voice
+  #      callback URLs in the Twilio console to
+  #      <tunnel-url>/api/v2/twilio/message and <tunnel-url>/api/v2/twilio/call.
+  #   4. Run `./scripts/setup-goalert.sh` (from fixora-api/) — creates the admin
+  #      user and provisions a default Service + Escalation Policy + Generic API
+  #      Integration Key via GoAlert's GraphQL API, then prints the webhook URL.
+  #      This replaces steps that used to be manual UI clicking (create
+  #      Service/Escalation Policy/Integration Key) — see script header comment
+  #      for env vars (GOALERT_URL, GOALERT_ADMIN_USER/PASS, etc).
+  #   5. Paste the printed webhook URL into an AlertConfiguration's
+  #      goalertServiceUrl field in the Fixora UI. If GOALERT_URL was a
+  #      localhost address, swap "localhost" for "host.docker.internal" in that
+  #      URL first — Keep's http action runs inside the keep-backend container
+  #      and needs to reach back out to the Docker host (same gotcha as the
+  #      AI RCA server, see the fixora-rca-ai repo's README).
+  #
+  # Still inherently manual (can't be scripted around): the Twilio account
+  # signup itself, and the tunnel. Everything else is one script.
+  #
+  # Full setup + test checklist: docs/goalert-setup.md
+  # ───────────────────────────────────────────────────────────────────────────
+  goalert:
+    image: goalert/goalert:latest
+    container_name: fixora_goalert
+    environment:
+      - GOALERT_DB_URL=postgres://goalert_user:goalert_password@postgres:5432/goalert_db?sslmode=disable
+      - GOALERT_DATA_ENCRYPTION_KEY=fixora-dev-goalert-encryption-key-change-me
+      - GOALERT_LISTEN_ADDR=:8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - fixora-network
     restart: unless-stopped

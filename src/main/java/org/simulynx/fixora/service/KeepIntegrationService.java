@@ -10,7 +10,6 @@ import org.simulynx.fixora.repository.ApplicationRepository;
 import org.simulynx.fixora.util.GsonUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -19,12 +18,16 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
+// Intentionally NOT @Transactional: this class does no DB writes, only reads (via
+// applicationRepository) and external HTTP calls to Keep. A class-level @Transactional here
+// used to (a) hold a DB connection open across every blocking Keep API call, and (b) cause any
+// RuntimeException thrown from a method here -- e.g. a Keep API failure -- to mark the CALLER's
+// transaction (AlertConfigurationService's) as rollback-only, so even catching and swallowing
+// that exception in the caller still failed the whole request with UnexpectedRollbackException.
 @Slf4j
 @Service
-@Transactional
 public class KeepIntegrationService {
 
     private static final Set<String> ACTIVE_STATUSES = Set.of("firing", "acknowledged");
@@ -182,13 +185,19 @@ public class KeepIntegrationService {
             payload.put("message", request.getMessage() != null ? request.getMessage() : "This is a test alert");
             payload.put("severity", request.getSeverity() != null ? request.getSeverity().toLowerCase() : "info");
             payload.put("source", List.of(request.getSource() != null ? request.getSource() : "FIXORA"));
-            payload.put("lastReceived", LocalDateTime.now().toString());
+            payload.put("lastReceived", Instant.now().toString());
             payload.put("fingerprint", "fixora-test-" + request.getAlertConfigurationId());
             // Keep has no native "application" concept, so this is how we tie an alert back
             // to the Fixora application it belongs to when listing active/closed alerts later.
+            // fixora_alert_config_id also lets each config's Keep workflow trigger scope itself
+            // to only its own alerts via a CEL filter (see buildWorkflowDefinition) -- without it,
+            // Keep runs every alert-type workflow on every alert event (confirmed via Keep's own
+            // workflowmanager.py: a trigger with neither "filters" nor "cel" always evaluates to
+            // should_run=True).
             payload.put("labels", Map.of(
                     "fixora_application_id", String.valueOf(applicationId),
-                    "fixora_application_alias", application.getAlias()
+                    "fixora_application_alias", application.getAlias(),
+                    "fixora_alert_config_id", String.valueOf(request.getAlertConfigurationId())
             ));
 
             Map<String, Object> response = keepClient.sendTestAlert(
@@ -274,18 +283,31 @@ public class KeepIntegrationService {
         try {
             List<Map<String, Object>> history = keepClient.getAlertHistory(fingerprint);
             Instant cutoff = Instant.now().minus(24, ChronoUnit.HOURS);
-            long recentCount = history.stream()
-                    .map(h -> h.get("lastReceived"))
-                    .filter(Objects::nonNull)
-                    .map(String::valueOf)
-                    .filter(ts -> {
-                        try {
-                            return Instant.parse(ts).isAfter(cutoff);
-                        } catch (Exception e) {
-                            return false;
-                        }
-                    })
-                    .count();
+            int unparseable = 0;
+            long recentCount = 0;
+            for (Map<String, Object> h : history) {
+                Object raw = h.get("lastReceived");
+                if (raw == null) {
+                    continue;
+                }
+                String ts = String.valueOf(raw);
+                try {
+                    if (Instant.parse(ts).isAfter(cutoff)) {
+                        recentCount++;
+                    }
+                } catch (Exception e) {
+                    unparseable++;
+                }
+            }
+            // Surfaced instead of silently dropping unparseable entries from the count -- a
+            // silent skip here previously made occurrencesLast24h look like a real, trustworthy
+            // number even when it was undercounting due to a timestamp format Keep changed or
+            // that this code doesn't handle.
+            if (unparseable > 0) {
+                log.warn("Skipped {} unparseable lastReceived timestamp(s) while counting recent "
+                                + "occurrences for fingerprint {} -- occurrencesLast24h may be undercounted",
+                        unparseable, fingerprint);
+            }
             alert.put("occurrencesLast24h", recentCount);
         } catch (Exception e) {
             log.warn("Failed to compute recent occurrence count for fingerprint {}", fingerprint, e);
@@ -295,12 +317,12 @@ public class KeepIntegrationService {
 
     public String createKeepWorkflowFromAlertConfig(Long alertConfigId, String alertName, String alertDescription,
                                                      String alertType, String severity, String channels) {
-        return createKeepWorkflowFromAlertConfig(alertConfigId, alertName, alertDescription, alertType, severity, channels, false);
+        return createKeepWorkflowFromAlertConfig(alertConfigId, alertName, alertDescription, alertType, severity, channels, false, null);
     }
 
     /**
      * Builds a Keep workflow "action" (not "step" — actions are the side-effecting stage in Keep's DSL)
-     * that calls the OpenSRE HTTP wrapper (see opensre-poc/server.py) with the triggering alert's data,
+     * that calls the fixora-rca-ai server (github.com/sid288791/fixora-rca-ai) with the triggering alert's data,
      * and enriches that alert with the response. host.docker.internal is required since this runs inside
      * the keep-backend container and needs to reach a process on the Docker host.
      */
@@ -335,20 +357,51 @@ public class KeepIntegrationService {
         return action;
     }
 
+    /**
+     * Builds a Keep workflow "action" that pages the on-call engineer via GoAlert's generic
+     * alert-ingestion API (see docs/goalert-setup.md). goalertServiceUrl is the full webhook URL
+     * including the per-service integration key/token
+     * (https://goalert.example.com/api/v2/generic/incoming?token=...), stored on the
+     * AlertConfiguration. GoAlert itself resolves the on-call schedule and calls/SMS's via its
+     * built-in Twilio integration — Fixora/Keep never talks to Twilio directly.
+     */
+    private Map<String, Object> buildGoAlertEscalationAction(String goalertServiceUrl) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("summary", "{{ alert.name }}");
+        body.put("details", "{{ alert.message }}");
+
+        Map<String, Object> with = new HashMap<>();
+        with.put("url", goalertServiceUrl);
+        with.put("method", "POST");
+        with.put("body", body);
+
+        Map<String, Object> provider = new HashMap<>();
+        provider.put("type", "http");
+        provider.put("config", "{{ providers.default-http }}");
+        provider.put("with", with);
+
+        Map<String, Object> action = new HashMap<>();
+        action.put("name", "goalert-escalation");
+        action.put("provider", provider);
+        return action;
+    }
+
     private Map<String, Object> buildWorkflowDefinition(Long alertConfigId, String alertName, String alertDescription,
                                                           String alertType, String severity, String channels,
-                                                          boolean triggerAiInvestigation) {
+                                                          boolean triggerAiInvestigation, String goalertServiceUrl) {
         Map<String, Object> workflowDefinition = new HashMap<>();
         workflowDefinition.put("name", "fixora-alert-" + alertConfigId + "-" + alertName.toLowerCase().replace(" ", "-"));
         workflowDefinition.put("description", alertDescription != null ? alertDescription : "Workflow for alert: " + alertName);
 
         Map<String, Object> triggers = new HashMap<>();
         triggers.put("type", "alert");
-        Map<String, Object> triggerConfig = new HashMap<>();
-        triggerConfig.put("alert_config_id", alertConfigId);
-        triggerConfig.put("alert_type", alertType);
-        triggerConfig.put("severity", severity);
-        triggers.put("config", triggerConfig);
+        // Keep's alert-trigger evaluation only ever reads "filters" or "cel" on a trigger
+        // (confirmed against Keep's own workflowmanager.py) -- a "config" key here, which this
+        // used to set, is silently ignored. Without filters/cel, Keep treats the trigger as
+        // always-matching and runs this workflow on EVERY alert event system-wide, not just this
+        // config's own alerts. Scope it to only this alert config's own alerts via the
+        // fixora_alert_config_id label stamped on every alert we send (see sendTestAlert).
+        triggers.put("cel", "labels.fixora_alert_config_id == \"" + alertConfigId + "\"");
         workflowDefinition.put("triggers", List.of(triggers));
 
         // Notification channels are stored in the alert_config DB table for future use
@@ -356,8 +409,20 @@ public class KeepIntegrationService {
         // No step is added here to avoid blocking the AI investigation action with a
         // placeholder HTTP call that would fail on a dummy URL.
 
+        List<Map<String, Object>> actions = new ArrayList<>();
+        // GoAlert escalation goes first — it's a fast webhook call that pages a human immediately.
+        // The AI investigation below can take 3-5 minutes; if it ran first, critical-severity
+        // paging would be delayed by that long. Both still execute within the same workflow run,
+        // so from the on-call engineer's perspective escalation and AI investigation happen in
+        // parallel rather than AI blocking the page.
+        if ("critical".equalsIgnoreCase(severity) && goalertServiceUrl != null && !goalertServiceUrl.isBlank()) {
+            actions.add(buildGoAlertEscalationAction(goalertServiceUrl));
+        }
         if (triggerAiInvestigation) {
-            workflowDefinition.put("actions", List.of(buildAiInvestigationAction()));
+            actions.add(buildAiInvestigationAction());
+        }
+        if (!actions.isEmpty()) {
+            workflowDefinition.put("actions", actions);
         }
 
         return workflowDefinition;
@@ -365,12 +430,13 @@ public class KeepIntegrationService {
 
     public String createKeepWorkflowFromAlertConfig(Long alertConfigId, String alertName, String alertDescription,
                                                      String alertType, String severity, String channels,
-                                                     boolean triggerAiInvestigation) {
+                                                     boolean triggerAiInvestigation, String goalertServiceUrl) {
         try {
             log.info("Creating Keep workflow for alert configuration {}", alertConfigId);
 
             Map<String, Object> workflowDefinition = buildWorkflowDefinition(
-                    alertConfigId, alertName, alertDescription, alertType, severity, channels, triggerAiInvestigation);
+                    alertConfigId, alertName, alertDescription, alertType, severity, channels,
+                    triggerAiInvestigation, goalertServiceUrl);
 
             Map<String, Object> result = keepClient.createWorkflow(workflowDefinition);
 
@@ -393,12 +459,13 @@ public class KeepIntegrationService {
      */
     public void updateKeepWorkflowFromAlertConfig(String keepWorkflowId, Long alertConfigId, String alertName,
                                                    String alertDescription, String alertType, String severity,
-                                                   String channels, boolean triggerAiInvestigation) {
+                                                   String channels, boolean triggerAiInvestigation, String goalertServiceUrl) {
         try {
             log.info("Updating Keep workflow {} for alert configuration {}", keepWorkflowId, alertConfigId);
 
             Map<String, Object> workflowDefinition = buildWorkflowDefinition(
-                    alertConfigId, alertName, alertDescription, alertType, severity, channels, triggerAiInvestigation);
+                    alertConfigId, alertName, alertDescription, alertType, severity, channels,
+                    triggerAiInvestigation, goalertServiceUrl);
 
             keepClient.updateWorkflow(keepWorkflowId, workflowDefinition);
 
