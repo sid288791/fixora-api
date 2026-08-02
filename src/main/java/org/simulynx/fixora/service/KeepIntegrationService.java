@@ -351,15 +351,10 @@ public class KeepIntegrationService {
         triggers.put("config", triggerConfig);
         workflowDefinition.put("triggers", List.of(triggers));
 
-        if (channels != null && !channels.isEmpty()) {
-            Map<String, Object> steps = new HashMap<>();
-            steps.put("name", "send-notification");
-            steps.put("type", "action");
-            Map<String, Object> stepConfig = new HashMap<>();
-            stepConfig.put("channels", channels);
-            steps.put("config", stepConfig);
-            workflowDefinition.put("steps", List.of(steps));
-        }
+        // Notification channels are stored in the alert_config DB table for future use
+        // when real notification providers (Slack, Teams, etc.) are configured in Keep.
+        // No step is added here to avoid blocking the AI investigation action with a
+        // placeholder HTTP call that would fail on a dummy URL.
 
         if (triggerAiInvestigation) {
             workflowDefinition.put("actions", List.of(buildAiInvestigationAction()));
