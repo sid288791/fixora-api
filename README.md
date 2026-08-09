@@ -250,6 +250,22 @@ docker compose logs -f postgres
 - **ORM**: Spring Data JPA
 - **Validation**: Jakarta Bean Validation
 
+## Documentation
+
+- **[GETTING_STARTED.md](GETTING_STARTED.md) — start here.** Full in-order walkthrough from a fresh
+  clone (all three repos) to a working critical-alert-with-AI-RCA pipeline: where every API key goes,
+  how to seed sample data, how to call the alert API, how to enable the AI toggle, and a full Twilio
+  account walkthrough for GoAlert paging.
+- [GoAlert Setup & Testing Guide](docs/goalert-setup.md) — deeper dive on critical-alert escalation to
+  on-call via SMS/voice (Twilio), including the full test checklist used to verify it end-to-end.
+- [fixora-rca-ai](https://github.com/sid288791/fixora-rca-ai) — the AI root-cause-analysis service
+  Keep calls into for alert investigation. Separate repo, not vendored here — see
+  `GETTING_STARTED.md` step 4 for setup.
+- Keep setup: see the comment block above the `keep-*` services in `docker-compose.yml`, and run
+  `./scripts/setup-keep.sh`.
+- GoAlert setup: see the comment block above the `goalert` service in `docker-compose.yml`, and run
+  `./scripts/setup-goalert.sh` (after starting a tunnel — see `docs/goalert-setup.md`).
+
 ## Support
 
 For issues and questions, please refer to the project documentation.

@@ -29,4 +29,9 @@ public class AlertConfigurationDTO {
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // Not persisted -- set only on the response from an update/create when the Keep workflow
+    // failed to sync, so the caller (UI) can surface a warning instead of silently believing
+    // everything (including e.g. the AI toggle) actually took effect in Keep.
+    private String keepSyncWarning;
 }

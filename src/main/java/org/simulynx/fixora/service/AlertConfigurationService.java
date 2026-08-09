@@ -47,6 +47,7 @@ public class AlertConfigurationService {
                 "ALERT_CONFIG", String.valueOf(saved.getId()), "CREATE", null, 
                 convertEntityToDto(saved));
         
+        String keepSyncWarning = null;
         try {
             String keepWorkflowId = keepIntegrationService.createKeepWorkflowFromAlertConfig(
                     saved.getId(),
@@ -55,9 +56,10 @@ public class AlertConfigurationService {
                     saved.getAlertType(),
                     saved.getSeverity(),
                     saved.getChannels(),
-                    Boolean.TRUE.equals(saved.getTriggerAiInvestigation())
+                    Boolean.TRUE.equals(saved.getTriggerAiInvestigation()),
+                    saved.getGoalertServiceUrl()
             );
-            
+
             if (keepWorkflowId != null) {
                 org.simulynx.fixora.dto.AlertWorkflowDTO workflowDto = new org.simulynx.fixora.dto.AlertWorkflowDTO();
                 workflowDto.setApplicationId(saved.getApplicationId());
@@ -70,16 +72,22 @@ public class AlertConfigurationService {
                 workflowDto.setNotificationChannelIds(saved.getChannels());
                 workflowDto.setIsActive(true);
                 workflowDto.setStatus("ACTIVE");
-                
+
                 alertWorkflowService.createAlertWorkflow(workflowDto);
                 log.info("Alert workflow created for alert configuration {}", saved.getId());
+            } else {
+                keepSyncWarning = "Keep did not return a workflow id -- this alert configuration has no working Keep workflow.";
             }
         } catch (Exception e) {
             log.error("Failed to create Keep workflow for alert configuration {}", saved.getId(), e);
+            keepSyncWarning = "Failed to create the Keep workflow: " + e.getMessage()
+                    + ". The alert configuration was saved, but alerts sent against it won't do anything until this is fixed.";
         }
-        
+
         log.info("Alert configuration created with id {}", saved.getId());
-        return convertEntityToDto(saved);
+        AlertConfigurationDTO result = convertEntityToDto(saved);
+        result.setKeepSyncWarning(keepSyncWarning);
+        return result;
     }
     
     public AlertConfigurationDTO getAlertConfiguration(Long applicationId, Long configId) {
@@ -142,22 +150,29 @@ public class AlertConfigurationService {
                 "ALERT_CONFIG", String.valueOf(configId), "UPDATE", oldValues,
                 convertEntityToDto(updated));
 
-        syncKeepWorkflow(updated);
+        String keepSyncWarning = syncKeepWorkflow(updated);
 
         log.info("Alert configuration updated with id {}", configId);
-        return convertEntityToDto(updated);
+        AlertConfigurationDTO result = convertEntityToDto(updated);
+        result.setKeepSyncWarning(keepSyncWarning);
+        return result;
     }
 
     /**
      * Regenerates the linked Keep workflow so config changes (in particular flipping
      * "Trigger AI Investigation" on/off) actually take effect on an already-existing config.
      * Without this, the AI action was only ever baked in at creation time.
+     *
+     * Returns a non-null warning message when the sync didn't happen or failed, so the caller can
+     * surface it (e.g. via keepSyncWarning on the response DTO) instead of the config silently
+     * saving as "updated" while Keep and Fixora drift out of sync with no visible indication.
      */
-    private void syncKeepWorkflow(AlertConfiguration config) {
+    private String syncKeepWorkflow(AlertConfiguration config) {
         List<AlertWorkflow> workflows = alertWorkflowRepository.findByAlertConfigurationId(config.getId());
         if (workflows.isEmpty()) {
+            String warning = "No Keep workflow is linked to this alert configuration -- Keep was not updated.";
             log.warn("No Keep workflow found for alert configuration {}, skipping sync", config.getId());
-            return;
+            return warning;
         }
 
         try {
@@ -170,10 +185,14 @@ public class AlertConfigurationService {
                     config.getAlertType(),
                     config.getSeverity(),
                     config.getChannels(),
-                    Boolean.TRUE.equals(config.getTriggerAiInvestigation())
+                    Boolean.TRUE.equals(config.getTriggerAiInvestigation()),
+                    config.getGoalertServiceUrl()
             );
+            return null;
         } catch (Exception e) {
             log.error("Failed to sync Keep workflow for alert configuration {}", config.getId(), e);
+            return "Failed to sync changes to Keep: " + e.getMessage()
+                    + ". The alert config was saved, but Keep may be running the old workflow.";
         }
     }
     
