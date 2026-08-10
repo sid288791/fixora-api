@@ -269,6 +269,36 @@ public class KeepClientImpl implements KeepClient {
 
     @Override
     @SuppressWarnings("unchecked")
+    public Map<String, Object> reportAlertEvent(Map<String, Object> alertPayload) {
+        try {
+            log.info("Reporting alert event to Keep API (fingerprint={})", alertPayload.get("fingerprint"));
+            String url = keepApiBaseUrl + "/alerts/event?provider_id=fixora-goalert-sync";
+            HttpEntity<Object> request = new HttpEntity<>(alertPayload, defaultHeaders());
+            Map<?, ?> response = restTemplate.postForObject(url, request, Map.class);
+
+            log.info("Successfully reported alert event to Keep API");
+            return response != null ? (Map<String, Object>) response : Map.of("status", "sent");
+        } catch (RestClientException e) {
+            log.error("Error reporting alert event to Keep API", e);
+            throw new RuntimeException("Failed to report alert event to Keep API", e);
+        }
+    }
+
+    @Override
+    public void enrichAlert(String fingerprint, Map<String, Object> enrichments) {
+        try {
+            log.info("Enriching Keep alert {} with {}", fingerprint, enrichments.keySet());
+            Map<String, Object> payload = Map.of("enrichments", enrichments, "fingerprint", fingerprint);
+            exchange("/alerts/enrich", HttpMethod.POST, payload);
+            log.info("Successfully enriched Keep alert {}", fingerprint);
+        } catch (RestClientException e) {
+            log.error("Error enriching Keep alert {}", fingerprint, e);
+            throw new RuntimeException("Failed to enrich Keep alert", e);
+        }
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getAlerts() {
         try {
             log.info("Fetching all alerts from Keep API");

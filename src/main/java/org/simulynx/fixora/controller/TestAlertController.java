@@ -43,6 +43,26 @@ public class TestAlertController {
         return ResponseEntity.ok(alerts);
     }
 
+    @PostMapping("/alerts/{fingerprint}/close")
+    public ResponseEntity<Map<String, Object>> closeAlert(
+            @PathVariable Long applicationId,
+            @PathVariable String fingerprint,
+            @RequestBody(required = false) Map<String, String> body) {
+        log.info("POST /api/applications/{}/alerts/{}/close", applicationId, fingerprint);
+
+        String rcaNote = body != null ? body.get("rcaNote") : null;
+        boolean closed = keepIntegrationService.closeAlert(applicationId, fingerprint, rcaNote);
+
+        if (!closed) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                    "success", false,
+                    "message", "No active alert with that fingerprint was found for this application"
+            ));
+        }
+
+        return ResponseEntity.ok(Map.of("success", true, "fingerprint", fingerprint));
+    }
+
     @GetMapping("/keep/health")
     public ResponseEntity<Map<String, Object>> checkKeepHealth(
             @PathVariable Long applicationId) {
