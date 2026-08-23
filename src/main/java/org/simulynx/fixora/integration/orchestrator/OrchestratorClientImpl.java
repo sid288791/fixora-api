@@ -25,7 +25,13 @@ import java.util.Map;
 public class OrchestratorClientImpl implements OrchestratorClient {
 
     private static final int CONNECT_TIMEOUT_MS = 5_000;
-    private static final int READ_TIMEOUT_MS = 60_000;
+    // Live-tested against a real Groq-backed diagnostic loop with zero matching evidence (worst
+    // case: all 3 bounded iterations run, 4 LLM calls per iteration plus the initial hypotheses
+    // and final conclusion calls) -- that run alone took over 60s and tripped the original
+    // timeout, surfacing as a spurious 502 even though the orchestrator was working correctly.
+    // 120s covers the full bounded loop with headroom while still failing fast on a genuinely
+    // stuck orchestrator.
+    private static final int READ_TIMEOUT_MS = 120_000;
 
     private final RestTemplate restTemplate;
     private final String orchestratorUrl;
