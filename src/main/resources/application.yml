@@ -39,6 +39,13 @@ goalert:
   sync:
     poll-interval-ms: ${GOALERT_SYNC_POLL_INTERVAL_MS:30000}
 
+# Used only by OrchestratorClient to call fixora-orchestrator-agent's phase-1,
+# Temporal-free /api/v1/deep-analysis endpoint when a human clicks "Start Deep
+# Analysis" on an alert's RCA card.
+orchestrator:
+  api:
+    url: ${ORCHESTRATOR_API_URL:http://localhost:8091}
+
 logging:
   level:
     root: INFO

@@ -63,6 +63,24 @@ public class TestAlertController {
         return ResponseEntity.ok(Map.of("success", true, "fingerprint", fingerprint));
     }
 
+    @PostMapping("/alerts/{fingerprint}/deep-analysis")
+    public ResponseEntity<Map<String, Object>> deepAnalysis(
+            @PathVariable Long applicationId,
+            @PathVariable String fingerprint) {
+        log.info("POST /api/applications/{}/alerts/{}/deep-analysis", applicationId, fingerprint);
+
+        try {
+            Map<String, Object> result = keepIntegrationService.runDeepAnalysis(applicationId, fingerprint);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Deep analysis failed for application={} fingerprint={}", applicationId, fingerprint, e);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of(
+                    "success", false,
+                    "message", "Deep analysis failed: " + e.getMessage()
+            ));
+        }
+    }
+
     @GetMapping("/keep/health")
     public ResponseEntity<Map<String, Object>> checkKeepHealth(
             @PathVariable Long applicationId) {

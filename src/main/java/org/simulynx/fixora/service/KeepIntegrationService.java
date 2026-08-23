@@ -7,6 +7,7 @@ import org.simulynx.fixora.dto.TestAlertResponse;
 import org.simulynx.fixora.entity.Application;
 import org.simulynx.fixora.integration.goalert.GoAlertClient;
 import org.simulynx.fixora.integration.keep.KeepClient;
+import org.simulynx.fixora.integration.orchestrator.OrchestratorClient;
 import org.simulynx.fixora.repository.ApplicationRepository;
 import org.simulynx.fixora.util.GsonUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +47,9 @@ public class KeepIntegrationService {
 
     @Autowired
     private GoAlertClient goAlertClient;
+
+    @Autowired
+    private OrchestratorClient orchestratorClient;
 
     @Value("${goalert.service-id:}")
     private String goalertServiceId;
@@ -236,6 +240,43 @@ public class KeepIntegrationService {
 
         log.info("Closed alert with fingerprint {} from Fixora (application {})", fingerprint, applicationId);
         return true;
+    }
+
+    /**
+     * Runs the phase-1 (diagnostic-only, Temporal-free) Deep Analysis for an alert, triggered
+     * when a human clicks "Start Deep Analysis" on the alert's RCA card in the Fixora UI — that
+     * click IS the human approval referenced in the orchestrator architecture diagram; there is
+     * no separate confirmation step. Read-only: does not touch alert status.
+     *
+     * @return the orchestrator's diagnostic result as-is (root_cause_analysis, evidence_collected, ...)
+     */
+    public Map<String, Object> runDeepAnalysis(Long applicationId, String fingerprint) {
+        Application application = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Application not found with id: " + applicationId));
+
+        Map<String, Object> existing = findKeepAlertByFingerprint(fingerprint);
+        if (existing == null) {
+            throw new RuntimeException("No alert found with fingerprint: " + fingerprint);
+        }
+
+        Object labelsObj = existing.get("labels");
+        String ownerAppId = labelsObj instanceof Map<?, ?> labels
+                ? String.valueOf(labels.get("fixora_application_id")) : null;
+        if (!String.valueOf(applicationId).equals(ownerAppId)) {
+            throw new RuntimeException("Alert with fingerprint " + fingerprint
+                    + " does not belong to application " + applicationId);
+        }
+
+        String existingRca = String.valueOf(existing.getOrDefault("ai_report", ""));
+
+        return orchestratorClient.runDeepAnalysis(
+                fingerprint,
+                String.valueOf(existing.get("name")),
+                String.valueOf(existing.getOrDefault("message", "")),
+                String.valueOf(existing.getOrDefault("severity", "info")),
+                application.getName(),
+                existingRca.isBlank() ? null : existingRca
+        );
     }
 
     private Map<String, Object> findKeepAlertByFingerprint(String fingerprint) {
