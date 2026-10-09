@@ -5,10 +5,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.simulynx.fixora.dto.TestAlertRequest;
 import org.simulynx.fixora.dto.TestAlertResponse;
 import org.simulynx.fixora.entity.Application;
+import org.simulynx.fixora.integration.goalert.GoAlertClient;
 import org.simulynx.fixora.integration.keep.KeepClient;
+import org.simulynx.fixora.integration.orchestrator.OrchestratorClient;
 import org.simulynx.fixora.repository.ApplicationRepository;
 import org.simulynx.fixora.util.GsonUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -41,6 +44,15 @@ public class KeepIntegrationService {
 
     @Autowired
     private ApplicationRepository applicationRepository;
+
+    @Autowired
+    private GoAlertClient goAlertClient;
+
+    @Autowired
+    private OrchestratorClient orchestratorClient;
+
+    @Value("${goalert.service-id:}")
+    private String goalertServiceId;
 
     private final Gson gson = GsonUtil.getInstance();
     
@@ -149,6 +161,152 @@ public class KeepIntegrationService {
         }
     }
     
+    /**
+     * Marks the Keep alert with the given fingerprint as resolved, by re-sending it to Keep's
+     * ingestion endpoint with status "resolved". Keep upserts alerts by fingerprint, so this needs
+     * to carry forward the alert's existing name/severity/source/labels rather than just the
+     * fingerprint and new status — sending a bare status update would otherwise blank those fields
+     * out, and getAlertsForApplication relies on the fixora_application_id/fixora_alert_config_id
+     * labels surviving to keep bucketing this alert as belonging to its application after closure.
+     * Called by GoAlertSyncScheduler when GoAlert reports the paired alert as closed. Returns false
+     * (rather than throwing) when no matching alert is found, since a stale/already-cleared
+     * fingerprint from GoAlert shouldn't fail the whole sync poll.
+     */
+    public boolean resolveAlertByFingerprint(String fingerprint) {
+        Map<String, Object> existing = findKeepAlertByFingerprint(fingerprint);
+        if (existing == null) {
+            log.warn("No Keep alert found for fingerprint {} while syncing a GoAlert closure", fingerprint);
+            return false;
+        }
+
+        resolveInKeep(existing, fingerprint);
+        log.info("Resolved Keep alert with fingerprint {} following GoAlert closure", fingerprint);
+        return true;
+    }
+
+    /**
+     * Closes an alert from the Fixora side (the reverse direction of resolveAlertByFingerprint,
+     * called instead when someone closes the alert from the Fixora UI/API rather than from
+     * GoAlert). Does two things, both best-effort against GoAlert so a GoAlert outage doesn't
+     * block closing the alert in Fixora/Keep: resolves it in Keep, optionally attaching an RCA
+     * note as an enrichment, and closes the matching alert in GoAlert so its escalation policy
+     * stops paging/texting anyone further for it.
+     *
+     * @return true if a matching alert belonging to this application was found and resolved
+     */
+    public boolean closeAlert(Long applicationId, String fingerprint, String rcaNote) {
+        applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Application not found with id: " + applicationId));
+
+        Map<String, Object> existing = findKeepAlertByFingerprint(fingerprint);
+        if (existing == null) {
+            log.warn("No Keep alert found for fingerprint {} while closing from Fixora", fingerprint);
+            return false;
+        }
+
+        Object labelsObj = existing.get("labels");
+        String ownerAppId = labelsObj instanceof Map<?, ?> labels
+                ? String.valueOf(labels.get("fixora_application_id")) : null;
+        if (!String.valueOf(applicationId).equals(ownerAppId)) {
+            log.warn("Alert with fingerprint {} does not belong to application {}, refusing to close",
+                    fingerprint, applicationId);
+            return false;
+        }
+
+        resolveInKeep(existing, fingerprint);
+
+        if (rcaNote != null && !rcaNote.isBlank()) {
+            keepClient.enrichAlert(fingerprint, Map.of(
+                    "fixora_rca_note", rcaNote,
+                    "fixora_closed_at", Instant.now().toString()
+            ));
+        }
+
+        if (goalertServiceId != null && !goalertServiceId.isBlank()) {
+            // Best-effort by design (see class javadoc above): a GoAlert outage shouldn't block
+            // closing the alert in Fixora/Keep, which has already happened by this point. Caught
+            // here specifically (rather than left to propagate) so that outage is distinguishable
+            // in the logs from GoAlertClient's normal "0 alerts matched" case -- both used to look
+            // identical before this call threw on real failures instead of swallowing them.
+            try {
+                int closedInGoAlert = goAlertClient.closeAlertsByFingerprint(goalertServiceId, fingerprint);
+                log.info("Closed {} matching GoAlert alert(s) for fingerprint {} following manual close in Fixora",
+                        closedInGoAlert, fingerprint);
+            } catch (Exception e) {
+                log.error("Alert {} was closed in Fixora/Keep, but closing the matching GoAlert alert(s) failed "
+                        + "-- GoAlert may keep escalating/paging for it until closed manually there", fingerprint, e);
+            }
+        }
+
+        log.info("Closed alert with fingerprint {} from Fixora (application {})", fingerprint, applicationId);
+        return true;
+    }
+
+    /**
+     * Runs the phase-1 (diagnostic-only, Temporal-free) Deep Analysis for an alert, triggered
+     * when a human clicks "Start Deep Analysis" on the alert's RCA card in the Fixora UI — that
+     * click IS the human approval referenced in the orchestrator architecture diagram; there is
+     * no separate confirmation step. Read-only: does not touch alert status.
+     *
+     * @return the orchestrator's diagnostic result as-is (root_cause_analysis, evidence_collected, ...)
+     */
+    public Map<String, Object> runDeepAnalysis(Long applicationId, String fingerprint) {
+        Application application = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Application not found with id: " + applicationId));
+
+        Map<String, Object> existing = findKeepAlertByFingerprint(fingerprint);
+        if (existing == null) {
+            throw new RuntimeException("No alert found with fingerprint: " + fingerprint);
+        }
+
+        Object labelsObj = existing.get("labels");
+        String ownerAppId = labelsObj instanceof Map<?, ?> labels
+                ? String.valueOf(labels.get("fixora_application_id")) : null;
+        if (!String.valueOf(applicationId).equals(ownerAppId)) {
+            throw new RuntimeException("Alert with fingerprint " + fingerprint
+                    + " does not belong to application " + applicationId);
+        }
+
+        String existingRca = String.valueOf(existing.getOrDefault("ai_report", ""));
+
+        return orchestratorClient.runDeepAnalysis(
+                fingerprint,
+                String.valueOf(existing.get("name")),
+                String.valueOf(existing.getOrDefault("message", "")),
+                String.valueOf(existing.getOrDefault("severity", "info")),
+                application.getName(),
+                existingRca.isBlank() ? null : existingRca
+        );
+    }
+
+    private Map<String, Object> findKeepAlertByFingerprint(String fingerprint) {
+        for (Map<String, Object> alert : keepClient.getAlerts()) {
+            if (fingerprint.equals(String.valueOf(alert.get("fingerprint")))) {
+                return alert;
+            }
+        }
+        return null;
+    }
+
+    private void resolveInKeep(Map<String, Object> existing, String fingerprint) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("name", existing.get("name"));
+        payload.put("status", "resolved");
+        payload.put("message", existing.get("message"));
+        payload.put("severity", existing.get("severity"));
+        Object source = existing.get("source");
+        payload.put("source", source instanceof List ? source
+                : source != null ? List.of(String.valueOf(source)) : List.of());
+        payload.put("lastReceived", Instant.now().toString());
+        payload.put("fingerprint", fingerprint);
+        Object labels = existing.get("labels");
+        if (labels instanceof Map) {
+            payload.put("labels", labels);
+        }
+
+        keepClient.reportAlertEvent(payload);
+    }
+
     public void deleteKeepWorkflow(String workflowId) {
         try {
             log.info("Deleting Keep workflow: {}", workflowId);
@@ -368,7 +526,7 @@ public class KeepIntegrationService {
     private Map<String, Object> buildGoAlertEscalationAction(String goalertServiceUrl) {
         Map<String, Object> body = new HashMap<>();
         body.put("summary", "{{ alert.name }}");
-        body.put("details", "{{ alert.message }}");
+        body.put("details", org.simulynx.fixora.util.GoAlertFingerprintTag.appendTo("{{ alert.message }}", "{{ alert.fingerprint }}"));
 
         Map<String, Object> with = new HashMap<>();
         with.put("url", goalertServiceUrl);
@@ -401,7 +559,14 @@ public class KeepIntegrationService {
         // always-matching and runs this workflow on EVERY alert event system-wide, not just this
         // config's own alerts. Scope it to only this alert config's own alerts via the
         // fixora_alert_config_id label stamped on every alert we send (see sendTestAlert).
-        triggers.put("cel", "labels.fixora_alert_config_id == \"" + alertConfigId + "\"");
+        //
+        // status == "firing" matters just as much as the label scoping: without it, Keep also
+        // runs this workflow on the "resolved" event that GoAlertSyncScheduler/closeAlert send
+        // back to Keep when an alert is closed (see resolveInKeep) -- which re-pages GoAlert for
+        // an alert that was just closed, live-tested and confirmed against Keep 2026-08-10 (an
+        // "alert.status" field reference silently never matches; the event's status is a
+        // top-level "status" field in the trigger's CEL context, confirmed the same way).
+        triggers.put("cel", "labels.fixora_alert_config_id == \"" + alertConfigId + "\" && status == \"firing\"");
         workflowDefinition.put("triggers", List.of(triggers));
 
         // Notification channels are stored in the alert_config DB table for future use

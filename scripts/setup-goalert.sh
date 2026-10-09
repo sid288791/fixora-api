@@ -95,10 +95,19 @@ RESULT=$(curl -s "${GOALERT_URL}/api/graphql" \
 
 echo "$RESULT"
 WEBHOOK_URL=$(echo "$RESULT" | sed -n 's/.*"href":"\([^"]*\)".*/\1/p')
+SERVICE_ID=$(echo "$RESULT" | sed -n 's/.*"createService":{"id":"\([^"]*\)".*/\1/p')
 
 echo ""
 echo "==> Done. Paste this into an AlertConfiguration's goalertServiceUrl field in the Fixora UI:"
 echo "    ${WEBHOOK_URL}"
+echo ""
+echo "==> To sync alert closures made in GoAlert back into Keep/Fixora, set these on fixora-api"
+echo "    (see docs/goalert-setup.md, 'Syncing closures back from GoAlert'):"
+echo "    GOALERT_API_URL=${GOALERT_URL}"
+echo "    GOALERT_SERVICE_ID=${SERVICE_ID}"
+echo "    GOALERT_SYNC_ADMIN_USER=${GOALERT_ADMIN_USER}"
+echo "    GOALERT_SYNC_ADMIN_PASS=<the GOALERT_ADMIN_PASS you passed to this script -- not"
+echo "      re-printed here on purpose, so it doesn't end up in terminal scrollback/CI logs>"
 echo ""
 echo "    If GOALERT_URL was a localhost address, swap 'localhost' for 'host.docker.internal'"
 echo "    in that URL first -- Keep's http action runs inside a container and needs to reach"

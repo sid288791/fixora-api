@@ -34,6 +34,20 @@ public interface KeepClient {
     List<Map<String, Object>> getAlerts();
     List<Map<String, Object>> getAlertHistory(String fingerprint);
 
+    /**
+     * Posts an alert event straight to Keep's /alerts/event endpoint, the same ingestion path
+     * used for every other alert (test alerts included). Used to push a status change -- e.g.
+     * "resolved" -- for an alert that already exists in Keep, keyed by its fingerprint.
+     */
+    Map<String, Object> reportAlertEvent(Map<String, Object> alertPayload);
+
+    /**
+     * Merges the given key/value pairs into an existing alert's enriched fields (Keep's
+     * POST /alerts/enrich, the same mechanism the AI-investigation workflow action uses for
+     * ai_root_cause etc). Used to attach an RCA note when an alert is closed manually.
+     */
+    void enrichAlert(String fingerprint, Map<String, Object> enrichments);
+
     // Health Check
     Boolean healthCheck();
 }

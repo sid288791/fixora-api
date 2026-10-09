@@ -26,7 +26,35 @@ keep:
     url: ${KEEP_API_URL:http://localhost:8080}
     key: ${KEEP_API_KEY:fixora-api-key}
 
+# Used only by GoAlertSyncScheduler to poll GoAlert for alerts closed on its side (GoAlert has no
+# outgoing webhook for status changes) and mirror that closure back into Keep. See
+# docs/goalert-setup.md. Sync is a no-op until goalert.service-id is set.
+goalert:
+  api:
+    url: ${GOALERT_API_URL:http://localhost:8081}
+  admin:
+    user: ${GOALERT_SYNC_ADMIN_USER:}
+    pass: ${GOALERT_SYNC_ADMIN_PASS:}
+  service-id: ${GOALERT_SERVICE_ID:}
+  sync:
+    poll-interval-ms: ${GOALERT_SYNC_POLL_INTERVAL_MS:30000}
+
+# Used only by OrchestratorClient to call fixora-orchestrator-agent's phase-1,
+# Temporal-free /api/v1/deep-analysis endpoint when a human clicks "Start Deep
+# Analysis" on an alert's RCA card.
+orchestrator:
+  api:
+    url: ${ORCHESTRATOR_API_URL:http://localhost:8091}
+
 logging:
   level:
     root: INFO
     org.springframework.web: DEBUG
+    # Both loggers below write full request/response bodies at DEBUG -- confirmed live that which
+    # one fires for a given RestTemplate call is inconsistent (HttpLogging for some calls,
+    # RestTemplate's own logger for others), so both need to be quieted, not just one. This
+    # includes the GoAlert admin password (GoAlertClientImpl.login) and any other secret sent
+    # through RestTemplate. Kept quieter than the rest of org.springframework.web rather than have
+    # every outbound call risk writing credentials to the log file.
+    org.springframework.web.HttpLogging: INFO
+    org.springframework.web.client.RestTemplate: INFO

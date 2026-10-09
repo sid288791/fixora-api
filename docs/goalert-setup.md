@@ -174,6 +174,37 @@ If steps 1-6 all pass but no SMS arrives, the issue is on Twilio's side specific
 the Twilio console not pointing at your current tunnel URL is the most common cause — tunnel URLs
 change every time you restart the tunnel, so re-check that after any tunnel restart).
 
+## Syncing closures back from GoAlert
+
+Paging is one-way by default: Keep calls GoAlert's generic incoming API to page someone, but
+GoAlert has no outgoing webhook for status changes, so closing an alert in the GoAlert UI (or via
+its own API) never reaches Keep or Fixora — the alert just sits there looking active on Fixora's
+side forever.
+
+`GoAlertSyncScheduler` (in `fixora-api`) closes that gap by polling GoAlert's GraphQL API on an
+interval, checking for alerts closed on the configured Service, and resolving the matching alert
+in Keep by fingerprint (the fingerprint is smuggled through GoAlert inside the alert's `details`
+text, since GoAlert's generic API returns no body and exposes no free-form metadata field over
+GraphQL to carry it any other way).
+
+It's off by default (a fresh checkout has no `GOALERT_SERVICE_ID` set, so the scheduler no-ops
+every tick). To turn it on, set on `fixora-api`:
+
+```bash
+GOALERT_API_URL=<same tunnel/URL used for GOALERT_URL above>
+GOALERT_SERVICE_ID=<printed at the end of setup-goalert.sh, or Service -> Details -> ID in the GoAlert UI>
+GOALERT_SYNC_ADMIN_USER=<a GoAlert admin username -- can reuse the one from step 3>
+GOALERT_SYNC_ADMIN_PASS=<its password>
+```
+
+`setup-goalert.sh` prints all four after it creates the Service. Poll interval defaults to 30
+seconds (`GOALERT_SYNC_POLL_INTERVAL_MS`).
+
+To test: fire a critical test alert (step 4 above), confirm it's active in Fixora, close it in the
+GoAlert UI (Alerts -> the alert -> Close), then within ~30s confirm the same alert shows up under
+Fixora/Keep's "closed" bucket. `fixora-api` logs `Resolved Keep alert with fingerprint ... following
+GoAlert closure` when it works.
+
 ## Known limitations (see also `docs/known-bugs.md` in the workspace root for broader Keep/GoAlert bugs)
 
 - ngrok's free tier gives a new URL every restart — fine for testing, but means the Twilio webhook

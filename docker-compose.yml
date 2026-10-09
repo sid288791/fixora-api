@@ -214,10 +214,81 @@ services:
       - fixora-network
     restart: unless-stopped
 
+  # ───────────────────────────────────────────────────────────────────────────
+  # Elasticsearch + Kibana + Elastic MCP server — evidence backend for the
+  # fixora-diagnostic-orchestrator-agent's KibanaAgent (Deep Analysis phase 1).
+  # xpack.security.enabled=false is dev-only, matching the existing vendored
+  # keep/elk/docker-compose-elk.yml.
+  # ───────────────────────────────────────────────────────────────────────────
+  elastic:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.0.0
+    container_name: fixora_elastic
+    environment:
+      - node.name=elastic
+      - cluster.name=fixora-elk
+      - discovery.type=single-node
+      - ELASTIC_PASSWORD=elastic
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=false
+      - xpack.license.self_generated.type=basic
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      # 9200 is remapped to 9201 on the host -- an unrelated pre-existing
+      # container ("es-node") already holds host port 9200 in this dev
+      # environment. Container-to-container traffic (Kibana, Elastic MCP,
+      # the log seeder if run in-network) still uses elastic:9200 internally.
+      - "9201:9200"
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      - fixora-network
+    restart: unless-stopped
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.0.0
+    container_name: fixora_kibana
+    depends_on:
+      elastic:
+        condition: service_healthy
+    environment:
+      - SERVERNAME=kibana
+      - ELASTICSEARCH_HOSTS=http://elastic:9200
+      - XPACK_SECURITY_ENABLED=false
+    ports:
+      - "5601:5601"
+    networks:
+      - fixora-network
+    restart: unless-stopped
+
+  # NOTE: no standalone "elastic-mcp" container. The published
+  # @elastic/mcp-server-elasticsearch npm package (0.3.1, the latest on npm
+  # as of this writing) only implements the MCP stdio transport -- there is
+  # no --transport http flag, confirmed by running it directly (it silently
+  # ignores unknown flags and starts a stdio server regardless). MCP servers
+  # of this kind are meant to be spawned as a subprocess by whichever process
+  # holds the MCP client session, not run as a standalone always-on service.
+  # fixora-diagnostic-orchestrator-agent's KibanaAgent/ElasticMcpClient spawns
+  # `npx -y @elastic/mcp-server-elasticsearch@0.3.1` itself (via the Python
+  # `mcp` SDK's stdio_client) with ES_URL pointed at this Elasticsearch on
+  # localhost:9201 and OTEL_SDK_DISABLED=true (the package's built-in Elastic
+  # APM auto-instrumentation otherwise writes non-JSON-RPC log lines to
+  # stdout on every failed metrics-export attempt, corrupting the stdio
+  # transport). Requires Node.js/npx on the same host as the diagnostic
+  # agent -- see fixora-diagnostic-orchestrator-agent/.env.example.
+
 volumes:
   postgres_data:
   redis_data:
   keep_state:
+  elastic_data:
 
 networks:
   fixora-network:
